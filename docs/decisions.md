@@ -49,3 +49,27 @@ Short records of choices that shaped the code, newest last. Each says what was d
 - `generateSeedData({ count, seed, asOf })` has no I/O and uses a seeded PRNG (mulberry32), never `Math.random`. The same command always builds the same company, and tests assert on real invariants: histories strictly increase, no pay cuts within a currency, and the current currency matches the employee's country.
 - Pay is modelled in USD-equivalent and converted per record with a country pay factor. A raise is therefore the same proportional change in any currency, and a relocation switches currency cleanly.
 - The writer replaces all data inside one transaction: a bad row rolls back and leaves the previous data untouched.
+
+## D8. Sorting the employee list by salary
+
+**Question:** "Sort by pay, highest first" means computing every employee's current salary before paginating. The options were a resolved table refreshed on write, a window function, or not offering the sort in v1.
+
+**Measured** on the 10k seed, warm cache, sorted page of 50 at offset 5,000:
+
+| Approach | Time |
+| --- | --- |
+| Correlated "latest record ≤ as-of" subquery, all employees | ~10 ms |
+| Same, filtered to one country | ~1–2 ms |
+| `row_number() OVER (PARTITION BY employee_id ORDER BY effective_date DESC)` | ~39 ms |
+
+The correlated subquery is one index seek per employee on `(employee_id, effective_date)`, not a scan. The window function numbers all ~61k records before discarding most of them.
+
+**The real problem is correctness, not speed.** An unfiltered sort ranks `amount_minor_units` across currencies and placed ¥14,608,800 (~$97k) between $146,200 and R$146,000. A cross-currency ranking is meaningless without conversion, which is out of scope (requirements).
+
+**Decision:**
+- `sort=salary` is accepted only together with a `currency` or `country` filter. Without one, the API returns 400 and the UI disables the column with an explanation.
+- Current salary is computed per request with the correlated as-of query. There is no cache.
+- **Rejected: a resolved table refreshed on write.** A future-dated raise becomes current at midnight without any write, so the table would silently go stale. Fixing that needs a `next_change_date` and a refresh on read: a cache with its own invalidation bugs, to save ~10 ms.
+- **Rejected: a window function.** Slower here and no clearer.
+
+**Revisit if** the list query passes 100 ms p95 (e.g. at 100k+ employees). The fallback is a resolved table keyed by employee, holding `current_record_id` and `next_change_date`, refreshed when a write lands or when today passes `next_change_date`.

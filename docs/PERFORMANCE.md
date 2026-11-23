@@ -19,3 +19,13 @@ A single transaction is what makes this fast. With autocommit, each insert is it
 | Current salary for every employee (correlated "latest record ≤ as-of" subquery), grouped by currency | 16 ms (`sqlite3 .timer`) |
 
 The plan for each hot query is pinned by tests (`backend/test/schema.test.ts`, "query plans"). API latency numbers for list and search will be added in the API block.
+
+## Salary sort (decision D8)
+
+Sorted page of 50 by current salary, at offset 5,000, warm cache, median of 3 runs:
+
+| Query | Time |
+| --- | --- |
+| Correlated as-of subquery, all 10,000 employees | ~10 ms |
+| Same, `WHERE country_code = 'US'` | ~1–2 ms |
+| Window function (`row_number()` per employee) | ~39 ms |
