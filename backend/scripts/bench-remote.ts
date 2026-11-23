@@ -1,7 +1,8 @@
 /**
  * Latency of a deployed instance from this machine, over a kept-alive
- * connection (so TLS setup is paid once, as in a browser). Subtract the
- * /api/health row to estimate server time vs network round trip.
+ * connection (so TLS setup is paid once, as in a browser). Each response's
+ * Server-Timing header gives the server's own time; total minus that is
+ * network (round trip + transfer), so the two are reported separately.
  * Run: npm run bench:remote -- https://your-app.onrender.com
  */
 const base = process.argv[2]?.replace(/\/$/, "");
@@ -22,15 +23,31 @@ const paths = [
 const pct = (s: number[], p: number) => s[Math.min(s.length - 1, Math.ceil((p / 100) * s.length) - 1)]!;
 
 await fetch(`${base}/api/health`); // open the connection
-console.log("| Path | p50 ms | p95 ms |\n| --- | --- | --- |");
+const serverMs = (res: Response) => {
+  const match = /app;dur=([\d.]+)/.exec(res.headers.get("server-timing") ?? "");
+  if (!match) throw new Error("No Server-Timing header: is the deployed build current?");
+  return Number(match[1]);
+};
+
+console.log("| Path | Total p50 | Total p95 | Server p50 | Server p95 | Network p50 |");
+console.log("| --- | --- | --- | --- | --- | --- |");
 for (const path of paths) {
-  const samples: number[] = [];
+  const total: number[] = [];
+  const server: number[] = [];
+  const network: number[] = [];
   for (let i = 0; i < RUNS; i++) {
     const t = performance.now();
     const res = await fetch(`${base}${path}`);
     await res.json();
-    samples.push(performance.now() - t);
+    const elapsed = performance.now() - t;
+    const s = serverMs(res);
+    total.push(elapsed);
+    server.push(s);
+    network.push(elapsed - s);
   }
-  samples.sort((a, b) => a - b);
-  console.log(`| \`${path}\` | ${pct(samples, 50).toFixed(0)} | ${pct(samples, 95).toFixed(0)} |`);
+  for (const list of [total, server, network]) list.sort((a, b) => a - b);
+  const f = (n: number) => `${n < 10 ? n.toFixed(1) : n.toFixed(0)} ms`;
+  console.log(
+    `| \`${path}\` | ${f(pct(total, 50))} | ${f(pct(total, 95))} | ${f(pct(server, 50))} | ${f(pct(server, 95))} | ${f(pct(network, 50))} |`,
+  );
 }

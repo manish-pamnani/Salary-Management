@@ -1,0 +1,23 @@
+# Keeps the Render free instance awake during the review window, so the first
+# visitor doesn't wait ~17 s for a cold start (docs/PERFORMANCE.md).
+# Render sleeps a free service after 15 idle minutes; this pings every 10.
+# GitHub runs schedules best-effort (they can start several minutes late), so
+# an occasional cold start is still possible. Disable this workflow after review.
+name: keep-warm
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Ping health endpoint
+        run: |
+          curl --silent --show-error --fail --max-time 90 --retry 2 \
+            --output /dev/null \
+            --write-out "status=%{http_code} time=%{time_total}s\n" \
+            https://salary-management-yguf.onrender.com/api/health

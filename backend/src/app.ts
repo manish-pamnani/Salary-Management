@@ -1,8 +1,10 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import type { Db } from "./db/connection.js";
 import { ApiError } from "./http/errors.js";
+import { addServerTiming } from "./http/server-timing.js";
 import { analyticsRoutes } from "./routes/analytics.js";
 import { employeeRoutes } from "./routes/employees.js";
+import { homeRoutes } from "./routes/home.js";
 import { metaRoutes } from "./routes/meta.js";
 import { assertValidTimeZone, todayInTimeZone } from "./clock.js";
 import { ORG_TIMEZONE } from "./config.js";
@@ -26,6 +28,7 @@ export function buildApp({ db, timeZone = ORG_TIMEZONE, today, logger = false }:
   assertValidTimeZone(timeZone);
   const app = Fastify({ logger });
   const ctx: RouteContext = { db, timeZone, today: today ?? (() => todayInTimeZone(timeZone)) };
+  addServerTiming(app);
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ApiError) {
@@ -43,6 +46,7 @@ export function buildApp({ db, timeZone = ORG_TIMEZONE, today, logger = false }:
   });
 
   app.get("/api/health", async () => ({ status: "ok" }));
+  app.register(homeRoutes(ctx));
   app.register(metaRoutes(ctx), { prefix: "/api" });
   app.register(employeeRoutes(ctx), { prefix: "/api" });
   app.register(analyticsRoutes(ctx), { prefix: "/api" });

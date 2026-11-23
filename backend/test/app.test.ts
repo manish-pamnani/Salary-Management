@@ -37,3 +37,23 @@ describe("app", () => {
     expect(res.json()).toEqual({ error: { code: "internal", message: "Something went wrong" } });
   });
 });
+
+describe("landing page and timing", () => {
+  it("serves an HTML page at / that names the as-of date, the persistence caveat, and links the API", async () => {
+    const app = buildApp({ db: createTestDb(), timeZone: "Asia/Kolkata", today: () => "2026-11-23" });
+    const res = await app.inject("/");
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["content-type"]).toMatch(/text\/html/);
+    expect(res.body).toContain("current as of 2026-11-23 (Asia/Kolkata)");
+    expect(res.body).toContain("not persistent");
+    expect(res.body).toContain('href="/api/employees"');
+  });
+
+  it("reports server time on every response, including errors", async () => {
+    const app = buildApp({ db: createTestDb() });
+    for (const url of ["/api/health", "/api/employees/999"]) {
+      const res = await app.inject(url);
+      expect(res.headers["server-timing"]).toMatch(/^app;dur=\d+\.\d$/);
+    }
+  });
+});

@@ -1,6 +1,6 @@
 # Salary Management
 
-**Live API:** https://salary-management-yguf.onrender.com/api/employees (Render free plan: the first request after 15 idle minutes is slow, see [PERFORMANCE.md](docs/PERFORMANCE.md#cold-start)).
+**Live API:** https://salary-management-yguf.onrender.com (see [limits of the live demo](#limits-of-the-live-demo) before editing data).
 
 A web tool that lets ACME's HR manager manage salaries for 10,000 employees across countries, and answer how the org pays people. See [`docs/requirements.md`](docs/requirements.md).
 
@@ -39,6 +39,12 @@ npm run bench           # route latency at 10,000 employees -> docs/PERFORMANCE.
 Money is always `amountMinorUnits` plus `currency` plus `minorUnitExponent`, never a float.
 
 Seed options: `npm run seed -- --count 10000 --seed 42 --as-of 2026-11-23`. The same options always produce the same data. Set `DATABASE_PATH` to put the database elsewhere.
+
+## Limits of the live demo
+
+- **Edits don't persist across restarts.** The live instance is on Render's free plan, which has no persistent disk: Render offers disks only on paid instances. SQLite lives on the container's own disk and is reseeded with the same 10,000 employees whenever the container starts. A salary record you add stays until the next restart, sleep or redeploy, then reverts. This is a hosting limit, not a bug. A paid instance with the disk block in `render.yaml` uncommented keeps the same code and keeps data; seeding only happens when the database is empty.
+- **The free instance sleeps after 15 idle minutes and takes about 17 s to wake** (measured; see [PERFORMANCE.md](docs/PERFORMANCE.md#cold-start)). A [GitHub Actions job](.github/workflows/keep-warm.yml) pings it every 10 minutes during the review window. GitHub runs schedules best-effort, so an occasional slow first load is still possible. An always-awake service uses about 744 of the 750 free instance-hours Render gives each month.
+- **"Today" is a date on the org's calendar (`ORG_TIMEZONE`, set to Asia/Kolkata).** It decides which salary counts as current and which month counts as this month. The page at `/` and `/api/meta` show it.
 
 ## Docs
 
