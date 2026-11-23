@@ -61,3 +61,42 @@ Measured on an Apple Silicon Mac, Node 24. The worst p95 is about 20 ms, roughly
 - **The 400 for an unsupported salary sort costs ~5 ms,** because proving "more than one currency" means checking the current currency of every matching row. `SELECT DISTINCT` cannot stop early once it has seen two currencies. That is acceptable, and it's the price of not assuming a country implies a currency.
 - **Aggregates (~17–20 ms) are the slowest routes:** they compute the current salary for all 10,000 people, then window over them for medians. They run on demand, not per keystroke, so nothing is cached.
 - **Search is a scan, on purpose.** See D9.
+
+## Deployed (Render free plan)
+
+Live at https://salary-management-yguf.onrender.com. It runs one Docker container with SQLite on the container's own disk, seeded on boot when empty.
+
+### Warm latency, measured from the developer's machine
+
+`npm run bench:remote -- <url>`: 30 requests per path over one kept-alive connection (TLS paid once, as in a browser), measured on 2026-11-23.
+
+| Path | p50 ms | p95 ms |
+| --- | --- | --- |
+| `/api/health` | 276 | 369 |
+| `/api/employees` | 268 | 354 |
+| `/api/employees?page=200` | 287 | 401 |
+| `/api/employees?search=pat` | 272 | 344 |
+| `/api/employees?sort=salary&order=desc&currency=USD&page=60` | 398 | 511 |
+| `/api/employees/1234` | 263 | 301 |
+| `/api/analytics/pay-summary?groupBy=department` | 468 | 1002 |
+| `/api/ask/department-cost?department=Engineering` | 432 | 586 |
+
+**How to read this:**
+- **`/api/health` does no work, so its ~276 ms is the network round trip** from the measuring machine to Render's region. Every row pays it, and it depends on where the viewer is, not on the code.
+- **Server time is each row minus health.** List, search and detail add ≈0–20 ms. Salary sort, pay summary and department cost add **~120–190 ms**, compared with 10–20 ms locally. The free plan's CPU allowance is a fraction of a core, so CPU-bound queries (current salary for all 10k, then window functions) run roughly 10× slower than on a laptop. The pay-summary p95 of ~1 s points to CPU throttling under bursts.
+- **Against the requirements' 300 ms target (set for local):** met locally by ~15×. When deployed, the list, search and detail routes add little on top of network latency. The aggregates are the routes that would gain from a paid instance (a full CPU) or, past that, the resolved current-salary table in D8.
+
+### Cold start
+
+Render's free plan puts the service to sleep after 15 minutes without traffic. Measured on 2026-11-23, after more than 25 idle minutes:
+
+| Request | Time |
+| --- | --- |
+| First `/api/employees` after sleep | **17.4 s** (HTTP 200) |
+| Next three requests | 0.33 s, 0.32 s, 0.81 s |
+
+**Where the 17 s goes:** almost all of it is Render waking the container (scheduling it and starting the image), not this app. Started from an empty disk, the app reaches "listening" in ~0.33 s natively, ~0.25 s of which is the 10k reseed. Under amd64 emulation it takes ~0.96 s (`bootMs` in the logs). So seeding on boot adds about a second at most to a cold start, and is not what makes it slow.
+
+**What it means in practice:** the first visitor after a quiet period waits about 17 s; everyone after that gets normal speed. Before recording the demo, open the URL once to wake it. A paid instance doesn't sleep and has no cold start. It would also keep data between restarts once a disk is attached (see `render.yaml`).
+
+*Measurement note:* two earlier attempts to time this with a background "wait 16 minutes, then request" job never sent a request, because the laptop slept and paused the timers. The number above comes from a direct request after a verified 25+ minute idle period.

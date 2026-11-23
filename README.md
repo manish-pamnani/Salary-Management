@@ -1,5 +1,7 @@
 # Salary Management
 
+**Live API:** https://salary-management-yguf.onrender.com/api/employees (Render free plan: the first request after 15 idle minutes is slow, see [PERFORMANCE.md](docs/PERFORMANCE.md#cold-start)).
+
 A web tool that lets ACME's HR manager manage salaries for 10,000 employees across countries, and answer how the org pays people. See [`docs/requirements.md`](docs/requirements.md).
 
 ## Status
@@ -7,7 +9,8 @@ A web tool that lets ACME's HR manager manage salaries for 10,000 employees acro
 - [x] Block 1: schema, migrations, deterministic 10,000-employee seed
 - [x] API: employees, salary history, append salary, analytics, Ask panel
 - [ ] UI
-- [ ] Deploy and demo
+- [x] Deploy API (Render, Docker, seeded on boot)
+- [ ] Demo video
 
 ## Run it
 
