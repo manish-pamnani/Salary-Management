@@ -20,7 +20,14 @@ const departmentCostSchema = z.object({
   month: month.optional(),
 });
 
-const currentSalarySchema = z.object({ q: z.string().trim().min(1).max(100) });
+/** Names collide (the 10k seed has 25 "Harper King"s), so return every match up to a cap, never just one. */
+export const MAX_NAME_MATCHES = 50;
+
+const currentSalarySchema = z.object({
+  q: z.string().trim().min(1).max(100),
+  country: countryCode.optional(),
+  department: z.string().max(100).optional(),
+});
 
 export const analyticsRoutes =
   ({ db, today }: RouteContext): FastifyPluginAsync =>
@@ -33,15 +40,18 @@ export const analyticsRoutes =
 
     // The three fixed questions from the requirements' "Ask" panel.
 
+    // Returns all matches with the fields needed to tell people apart
+    // (department, country, title, email, start date). The caller narrows
+    // with country/department rather than the API guessing which one was meant.
     app.get("/ask/current-salary", async (request) => {
-      const { q } = parse(currentSalarySchema, request.query);
+      const { q, country, department } = parse(currentSalarySchema, request.query);
       const asOf = today();
       const { items, total } = listEmployees(
         db,
-        { search: q, sort: "name", order: "asc", page: 1, pageSize: 5 },
+        { search: q, country, department, sort: "name", order: "asc", page: 1, pageSize: MAX_NAME_MATCHES },
         asOf,
       );
-      return { asOf, matches: items, totalMatches: total };
+      return { asOf, matches: items, totalMatches: total, truncated: total > items.length };
     });
 
     app.get("/ask/department-cost", async (request) => {

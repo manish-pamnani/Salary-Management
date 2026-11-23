@@ -97,6 +97,40 @@ describe("GET /api/ask/current-salary", () => {
     expect(body.matches[0]).toMatchObject({ fullName: "Eng Three", currentSalary: { amountMinorUnits: 200_000_00 } });
   });
 
+  it("returns every employee who shares a name, with what's needed to tell them apart", async () => {
+    const get = setup((db) => {
+      addPerson(db, "Priya Patel", { country: "IN", department: "Engineering", salaries: [["2020-01-01", 3_000_000_00, "INR"]] });
+      addPerson(db, "Priya Patel", { country: "GB", department: "Sales", salaries: [["2020-01-01", 55_000_00, "GBP"]] });
+      addPerson(db, "Priya Patel", { country: "IN", department: "Finance", salaries: [["2020-01-01", 2_000_000_00, "INR"]] });
+      addPerson(db, "Priya Shah", { country: "IN", department: "Engineering", salaries: [["2020-01-01", 1_00, "INR"]] });
+    });
+    const { body } = await get("/api/ask/current-salary?q=priya%20patel");
+    expect(body).toMatchObject({ totalMatches: 3, truncated: false });
+    expect(body.matches.map((m: { id: number; countryCode: string; department: string }) => [m.id, m.countryCode, m.department]))
+      .toEqual([[1, "IN", "Engineering"], [2, "GB", "Sales"], [3, "IN", "Finance"]]);
+    expect(body.matches[1].currentSalary).toMatchObject({ amountMinorUnits: 55_000_00, currency: "GBP" });
+  });
+
+  it("narrows shared names by department or country", async () => {
+    const get = setup((db) => {
+      addPerson(db, "Priya Patel", { country: "IN", department: "Engineering", salaries: [["2020-01-01", 1_00, "INR"]] });
+      addPerson(db, "Priya Patel", { country: "GB", department: "Sales", salaries: [["2020-01-01", 1_00, "GBP"]] });
+      addPerson(db, "Priya Patel", { country: "IN", department: "Finance", salaries: [["2020-01-01", 1_00, "INR"]] });
+    });
+    expect((await get("/api/ask/current-salary?q=priya%20patel&department=Finance")).body.matches.map((m: { id: number }) => m.id))
+      .toEqual([3]);
+    expect((await get("/api/ask/current-salary?q=priya%20patel&country=IN")).body.totalMatches).toBe(2);
+  });
+
+  it("says when there are more matches than it returned", async () => {
+    const get = setup((db) => {
+      for (let i = 0; i < 52; i++) addPerson(db, "Harper King", { salaries: [["2020-01-01", 1_00, "USD"]] });
+    });
+    const { body } = await get("/api/ask/current-salary?q=harper%20king");
+    expect(body).toMatchObject({ totalMatches: 52, truncated: true });
+    expect(body.matches).toHaveLength(50);
+  });
+
   it("requires a question", async () => {
     const get = setup(company);
     expect((await get("/api/ask/current-salary?q=%20")).status).toBe(400);

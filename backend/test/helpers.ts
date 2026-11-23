@@ -62,7 +62,7 @@ export function addPerson(
   const startDate = opts.startDate ?? salaries[0]?.[0] ?? "2020-01-01";
   const id = insertEmployee(db, {
     full_name: fullName,
-    email: `${fullName.toLowerCase().replace(/[^a-z]+/g, ".")}@acme.example`,
+    email: `${fullName.toLowerCase().replace(/[^a-z]+/g, ".")}.${employeeCounter + 1}@acme.example`, // names collide; emails must not
     country_code: opts.country ?? "US",
     department: opts.department ?? "Engineering",
     start_date: startDate,
