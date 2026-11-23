@@ -45,3 +45,35 @@ export function insertSalary(db: Db, employeeId: number, overrides: Partial<Reco
     )
     .run(row);
 }
+
+type SalaryTuple = [effectiveDate: string, amountMinorUnits: number, currency: string, reason?: string];
+
+/**
+ * Inserts one employee with a salary history, readable at a glance:
+ *   addPerson(db, "Priya Patel", { country: "IN", salaries: [["2020-01-01", 2_000_000_00, "INR"]] })
+ * The first salary defaults to reason 'hire' on the start date.
+ */
+export function addPerson(
+  db: Db,
+  fullName: string,
+  opts: { country?: string; department?: string; startDate?: string; salaries?: SalaryTuple[] } = {},
+): number {
+  const salaries = opts.salaries ?? [];
+  const startDate = opts.startDate ?? salaries[0]?.[0] ?? "2020-01-01";
+  const id = insertEmployee(db, {
+    full_name: fullName,
+    email: `${fullName.toLowerCase().replace(/[^a-z]+/g, ".")}@acme.example`,
+    country_code: opts.country ?? "US",
+    department: opts.department ?? "Engineering",
+    start_date: startDate,
+  });
+  salaries.forEach(([effective_date, amount_minor_units, currency, reason], index) => {
+    insertSalary(db, id, {
+      effective_date,
+      amount_minor_units,
+      currency,
+      reason: reason ?? (index === 0 ? "hire" : "annual_review"),
+    });
+  });
+  return id;
+}
