@@ -99,4 +99,4 @@ Render's free plan puts the service to sleep after 15 minutes without traffic. M
 
 **What it means in practice:** the first visitor after a quiet period waits about 17 s; everyone after that gets normal speed. Before recording the demo, open the URL once to wake it. A paid instance doesn't sleep and has no cold start. It would also keep data between restarts once a disk is attached (see `render.yaml`).
 
-*Measurement note:* two earlier attempts to time this with a background "wait 16 minutes, then request" job never sent a request, because the laptop slept and paused the timers. The number above comes from a direct request after a verified 25+ minute idle period.
+*Measurement note:* two earlier attempts used a background "wait 16 minutes, then request" job. The laptop slept and paused both timers, so neither fired on schedule. One eventually resumed and sent its request three minutes after the direct measurement had woken the service, so it recorded a warm 0.37 s; that result is discarded. The number above comes from a direct request after a verified 25+ minute idle period.
