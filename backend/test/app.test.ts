@@ -49,6 +49,15 @@ describe("landing page and timing", () => {
     expect(res.body).toContain('href="/api/employees"');
   });
 
+  it("escapes every ampersand, so query strings survive the HTML parser", async () => {
+    // Regression: href="...&currency=USD" was decoded by browsers as "¤cy=USD"
+    // because "&curren" is a legacy entity that needs no semicolon.
+    const app = buildApp({ db: createTestDb(), today: () => "2026-11-23" });
+    const html = (await app.inject("/")).body;
+    expect(html).toContain('href="/api/employees?sort=salary&amp;order=desc&amp;currency=USD"');
+    expect(html.match(/&(?!amp;|lt;|gt;|quot;|#39;)/g)).toBeNull();
+  });
+
   it("reports server time on every response, including errors", async () => {
     const app = buildApp({ db: createTestDb() });
     for (const url of ["/api/health", "/api/employees/999"]) {
