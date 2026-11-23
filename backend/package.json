@@ -13,8 +13,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "dev": "tsx watch src/server.ts",
-    "start": "tsx src/server.ts",
-    "bench": "tsx scripts/bench-http.ts"
+    "start": "node dist/server.js",
+    "bench": "tsx scripts/bench-http.ts",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && cp -r src/db/migrations dist/db/migrations"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

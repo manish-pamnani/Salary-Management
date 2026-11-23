@@ -1,0 +1,23 @@
+# Render blueprint: New > Blueprint > pick this repo.
+services:
+  - type: web
+    name: salary-management
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      # Whose calendar decides "today" (D10). Change to the HR manager's zone.
+      - key: ORG_TIMEZONE
+        value: Asia/Kolkata
+      # Free plan has no persistent disk: each cold start begins empty and reseeds
+      # (~0.25 s). Salary records added through the app are lost on restart.
+      # For persistence: plan: starter, add the disk below, keep SEED_ON_BOOT
+      # (it only seeds when empty).
+      - key: SEED_ON_BOOT
+        value: if-empty
+    # disk:
+    #   name: data
+    #   mountPath: /app/data
+    #   sizeGB: 1
