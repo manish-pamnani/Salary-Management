@@ -201,6 +201,45 @@ describe("GET /api/ask/department-cost", () => {
     ]);
   });
 
+  describe("proration rule (decision D10)", () => {
+    const ops = (salaries: [string, number, string, string?][]) => (db: Db) =>
+      addPerson(db, "P", { department: "Ops", salaries: salaries as never });
+    const cost = async (build: (db: Db) => void, month: string) =>
+      (await setup(build)(`/api/ask/department-cost?department=Ops&month=${month}`)).body;
+
+    it("counts a raise on the 1st as the whole month at the new rate", async () => {
+      const body = await cost(ops([["2020-01-01", 120_000_00, "USD"], ["2026-05-01", 240_000_00, "USD"]]), "2026-05");
+      expect(body.byCurrency[0].costMinorUnits).toBe(20_000_00);
+    });
+
+    it("counts the effective date itself at the new rate (boundary is inclusive)", async () => {
+      // Raise on 30 June: 29 days at 10,000/month + 1 day at 20,000/month
+      // = 9,666.67 + 666.67 = 10,333.33
+      const body = await cost(ops([["2020-01-01", 120_000_00, "USD"], ["2026-06-30", 240_000_00, "USD"]]), "2026-06");
+      expect(body.byCurrency[0].costMinorUnits).toBe(1_033_333);
+    });
+
+    it("uses calendar days, so February's day count is 28", async () => {
+      // Raise on 15 Feb 2026: 14 days old + 14 days new = exactly half each
+      // = 5,000 + 10,000 = 15,000.00
+      const body = await cost(ops([["2020-01-01", 120_000_00, "USD"], ["2026-02-15", 240_000_00, "USD"]]), "2026-02");
+      expect(body.byCurrency[0].costMinorUnits).toBe(15_000_00);
+    });
+
+    it("includes a raise scheduled later this month for its days, and flags the figure as a projection", async () => {
+      // Today is 15 June; raise effective 21 June: 20 days old + 10 days new
+      // = 6,666.67 + 6,666.67 = 13,333.33
+      const body = await cost(ops([["2020-01-01", 120_000_00, "USD"], ["2026-06-21", 240_000_00, "USD"]]), "2026-06");
+      expect(body).toMatchObject({ asOf: TODAY, includesScheduledChanges: true });
+      expect(body.byCurrency[0].costMinorUnits).toBe(1_333_333);
+    });
+
+    it("does not flag a month whose changes have all taken effect", async () => {
+      const body = await cost(ops([["2020-01-01", 120_000_00, "USD"], ["2026-06-21", 240_000_00, "USD"]]), "2026-05");
+      expect(body.includesScheduledChanges).toBe(false);
+    });
+  });
+
   it("validates the month", async () => {
     const get = setup(() => {});
     expect((await get("/api/ask/department-cost?department=Ops&month=2026-13")).status).toBe(400);

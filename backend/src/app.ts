@@ -4,10 +4,13 @@ import { ApiError } from "./http/errors.js";
 import { analyticsRoutes } from "./routes/analytics.js";
 import { employeeRoutes } from "./routes/employees.js";
 import { metaRoutes } from "./routes/meta.js";
-import { todayIso } from "./seed/dates.js";
+import { assertValidTimeZone, todayInTimeZone } from "./clock.js";
+import { ORG_TIMEZONE } from "./config.js";
 
 export interface AppDeps {
   db: Db;
+  /** IANA zone whose calendar decides "today" (D10). Defaults to ORG_TIMEZONE. */
+  timeZone?: string;
   /** "Today" as YYYY-MM-DD. Injected so tests can pin the date that decides what is current. */
   today?: () => string;
   logger?: boolean;
@@ -15,12 +18,14 @@ export interface AppDeps {
 
 export interface RouteContext {
   db: Db;
+  timeZone: string;
   today: () => string;
 }
 
-export function buildApp({ db, today = todayIso, logger = false }: AppDeps): FastifyInstance {
+export function buildApp({ db, timeZone = ORG_TIMEZONE, today, logger = false }: AppDeps): FastifyInstance {
+  assertValidTimeZone(timeZone);
   const app = Fastify({ logger });
-  const ctx: RouteContext = { db, today };
+  const ctx: RouteContext = { db, timeZone, today: today ?? (() => todayInTimeZone(timeZone)) };
 
   app.setErrorHandler((error, request, reply) => {
     if (error instanceof ApiError) {

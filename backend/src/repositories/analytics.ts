@@ -83,15 +83,32 @@ export interface DepartmentCostRow {
   costMinorUnits: number;
 }
 
+export interface DepartmentCost {
+  byCurrency: DepartmentCostRow[];
+  /** True when a record dated after asOf affects this month: the figure is a projection. */
+  includesScheduledChanges: boolean;
+}
+
 /**
  * What a department's salaries cost in one calendar month, per currency.
- * Annual salary / 12, prorated by the days each record was in effect that
- * month, so a raise on the 15th or a hire on the 21st counts only for the
- * days it applies. A future month includes scheduled raises.
+ * Rule (decision D10): monthly rate = annual / 12, prorated by calendar days.
+ * A record is in effect from its effective date (inclusive) until the day
+ * before the next record, so a raise on 15 June pays the old rate for 1–14
+ * and the new rate for 15–30. Scheduled records inside the month count for
+ * their days, and the result is flagged as a projection.
  */
-export function departmentMonthlyCost(db: Db, department: string, month: string): DepartmentCostRow[] {
+export function departmentMonthlyCost(db: Db, department: string, month: string, asOf: string): DepartmentCost {
   const monthStart = `${month}-01`;
-  return db
+  const includesScheduledChanges =
+    db
+      .prepare(
+        `SELECT 1 FROM salary_records s JOIN employees e ON e.id = s.employee_id
+         WHERE e.department = @department AND s.effective_date > @asOf
+           AND s.effective_date < date(@monthStart, '+1 month')
+         LIMIT 1`,
+      )
+      .get({ department, asOf, monthStart }) !== undefined;
+  const byCurrency = db
     .prepare(
       `WITH bounds AS (
          SELECT @monthStart AS start_date, date(@monthStart, '+1 month') AS end_date
@@ -119,4 +136,5 @@ export function departmentMonthlyCost(db: Db, department: string, month: string)
        ORDER BY headcount DESC, o.currency`,
     )
     .all({ department, monthStart }) as DepartmentCostRow[];
+  return { byCurrency, includesScheduledChanges };
 }

@@ -1,10 +1,10 @@
 import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { parseArgs } from "node:util";
-import { DATABASE_PATH } from "../config.js";
+import { todayInTimeZone } from "../clock.js";
+import { DATABASE_PATH, ORG_TIMEZONE } from "../config.js";
 import { openDatabase } from "../db/connection.js";
 import { migrate } from "../db/migrate.js";
-import { todayIso } from "./dates.js";
 import { generateSeedData } from "./generate.js";
 import { writeSeedData } from "./write.js";
 
@@ -16,7 +16,7 @@ const { values } = parseArgs({
   options: {
     count: { type: "string", default: "10000" },
     seed: { type: "string", default: "42" },
-    "as-of": { type: "string", default: todayIso() },
+    "as-of": { type: "string", default: todayInTimeZone(ORG_TIMEZONE) },
   },
 });
 

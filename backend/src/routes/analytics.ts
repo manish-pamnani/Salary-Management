@@ -56,11 +56,13 @@ export const analyticsRoutes =
 
     app.get("/ask/department-cost", async (request) => {
       const query = parse(departmentCostSchema, request.query);
-      const targetMonth = query.month ?? today().slice(0, 7);
+      const asOf = today();
+      const targetMonth = query.month ?? asOf.slice(0, 7);
       return {
         department: query.department,
         month: targetMonth,
-        byCurrency: departmentMonthlyCost(db, query.department, targetMonth),
+        asOf,
+        ...departmentMonthlyCost(db, query.department, targetMonth, asOf),
       };
     });
 

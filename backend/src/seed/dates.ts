@@ -20,7 +20,3 @@ export function addDays(iso: string, days: number): string {
 export function yearOf(iso: string): number {
   return Number(iso.slice(0, 4));
 }
-
-export function todayIso(): string {
-  return toIsoDate(new Date());
-}
