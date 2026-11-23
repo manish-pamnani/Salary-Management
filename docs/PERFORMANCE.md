@@ -66,25 +66,26 @@ Measured on an Apple Silicon Mac, Node 24. The worst p95 is about 20 ms, roughly
 
 Live at https://salary-management-yguf.onrender.com. It runs one Docker container with SQLite on the container's own disk, seeded on boot when empty.
 
-### Warm latency, measured from the developer's machine
+### Warm latency, measured from the developer's machine (India)
 
-`npm run bench:remote -- <url>`: 30 requests per path over one kept-alive connection (TLS paid once, as in a browser), measured on 2026-11-23.
+`npm run bench:remote -- <url>`: 30 requests per path over one kept-alive connection (TLS paid once, as in a browser), measured on 2026-11-23. **Server** is the app's own time, from the `Server-Timing: app;dur=` header on every response: request in to response body serialized. **Network** is total minus server: the round trip from India to Render's region, plus transfer.
 
-| Path | p50 ms | p95 ms |
-| --- | --- | --- |
-| `/api/health` | 276 | 369 |
-| `/api/employees` | 268 | 354 |
-| `/api/employees?page=200` | 287 | 401 |
-| `/api/employees?search=pat` | 272 | 344 |
-| `/api/employees?sort=salary&order=desc&currency=USD&page=60` | 398 | 511 |
-| `/api/employees/1234` | 263 | 301 |
-| `/api/analytics/pay-summary?groupBy=department` | 468 | 1002 |
-| `/api/ask/department-cost?department=Engineering` | 432 | 586 |
+| Path | Total p50 | Total p95 | Server p50 | Server p95 | Network p50 |
+| --- | --- | --- | --- | --- | --- |
+| `/api/health` | 283 ms | 364 ms | 0.1 ms | 0.2 ms | 283 ms |
+| `/api/employees` | 286 ms | 359 ms | 1.3 ms | 4.5 ms | 285 ms |
+| `/api/employees?page=200` | 293 ms | 399 ms | 15 ms | 105 ms | 268 ms |
+| `/api/employees?search=pat` | 282 ms | 384 ms | 6.3 ms | 7.5 ms | 275 ms |
+| `/api/employees?sort=salary&order=desc&currency=USD&page=60` | 385 ms | 511 ms | 49 ms | 240 ms | 266 ms |
+| `/api/employees/1234` | 268 ms | 364 ms | 0.8 ms | 1.1 ms | 267 ms |
+| `/api/analytics/pay-summary?groupBy=department` | 417 ms | 666 ms | 142 ms | 316 ms | 267 ms |
+| `/api/ask/department-cost?department=Engineering` | 487 ms | 592 ms | 151 ms | 242 ms | 280 ms |
 
 **How to read this:**
-- **`/api/health` does no work, so its ~276 ms is the network round trip** from the measuring machine to Render's region. Every row pays it, and it depends on where the viewer is, not on the code.
-- **Server time is each row minus health.** List, search and detail add ≈0–20 ms. Salary sort, pay summary and department cost add **~120–190 ms**, compared with 10–20 ms locally. The free plan's CPU allowance is a fraction of a core, so CPU-bound queries (current salary for all 10k, then window functions) run roughly 10× slower than on a laptop. The pay-summary p95 of ~1 s points to CPU throttling under bursts.
-- **Against the requirements' 300 ms target (set for local):** met locally by ~15×. When deployed, the list, search and detail routes add little on top of network latency. The aggregates are the routes that would gain from a paid instance (a full CPU) or, past that, the resolved current-salary table in D8.
+- **The list route is ~1 ms of server time and ~285 ms of network.** Every row pays the same 265–285 ms round trip, including `/api/health`, which does no work. That depends on where the viewer is, not on the code. A host region closer to the users (e.g. Singapore for a Delhi-based manager) would cut it; Render fixes a service's region when it's created, so moving means a new service.
+- **Server time on the free plan is ~3–10× the laptop numbers** for CPU-bound routes: about 150 ms vs 17–20 ms for the aggregates, and 49 ms vs 9–12 ms for the salary sort. The free instance gets a fraction of a CPU.
+- **Server p95 is much higher than p50 on the heavier routes** (salary sort 49 → 240 ms, deep page 15 → 105 ms). The median stays low, which points to CPU throttling under bursts of back-to-back requests rather than slow queries.
+- **Against the requirements' 300 ms target (set for local):** every route's *server* time is within it, worst p95 316 ms for pay summary under throttling, and is met ~15× over locally. If the aggregates' server time ever matters on real hardware, D8's resolved current-salary table is the next step.
 
 ### Cold start
 
