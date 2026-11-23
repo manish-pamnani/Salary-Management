@@ -28,7 +28,7 @@ Internationalisation, notifications, mobile app.
 
 employees: id, name, email, country, department, title, startdate. salaryrecords: id, employeeid, amountminorunits, currency, effectivedate, reason, createdat. Indexes on (employeeid, effective_date desc), (country), (department).
 Money stored as integers in minor units, never floats. Currency stored per record, so a person can change country without losing history.
-Validation: amount greater than zero, ISO-4217 currency, effective date not beyond today, and no two records for one employee on the same effective date.
+Validation: amount greater than zero, ISO-4217 currency, a real calendar date, and no two records for one employee on the same effective date. Future effective dates are allowed (an approved raise that starts next month) but never count as current; see docs/decisions.md, D4.
 
 ## Performance
 
