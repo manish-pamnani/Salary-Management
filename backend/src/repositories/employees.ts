@@ -35,6 +35,13 @@ export interface EmployeeListResult {
   page: number;
   pageSize: number;
   total: number;
+  /** The date that decided "current salary" for every row. */
+  asOf: string;
+  /**
+   * Currencies the matching employees are currently paid in. The UI enables the
+   * salary sort only when this has exactly one entry (D8), and says why otherwise.
+   */
+  salaryCurrencies: string[];
   /** Set when sort=salary had no explicit currency and one was proven from the data (D8). */
   resolvedCurrency?: string;
 }
@@ -100,14 +107,15 @@ export function listEmployees(db: Db, query: EmployeeListQuery, asOf: string): E
   const clauses = [...filters.clauses];
   const params: Record<string, string | number> = { ...filters.params, asOf };
   let resolvedCurrency: string | undefined;
+  // With an explicit currency filter, every match is paid in it by definition.
+  const currencies = query.currency ? undefined : currenciesInPlay(db, filters, asOf);
 
   if (query.currency) {
     clauses.push("cs.currency = @currency");
     params.currency = query.currency;
-  } else if (query.sort === "salary") {
+  } else if (query.sort === "salary" && currencies) {
     // Ranking rupees against dollars is meaningless. Without an explicit currency,
     // sort only if every matching employee is currently paid in the same one.
-    const currencies = currenciesInPlay(db, filters, asOf);
     if (currencies.length > 1) {
       throw new ApiError(
         400,
@@ -146,6 +154,8 @@ export function listEmployees(db: Db, query: EmployeeListQuery, asOf: string): E
     page: query.page,
     pageSize: query.pageSize,
     total,
+    asOf,
+    salaryCurrencies: currencies ?? (total > 0 ? [query.currency!] : []),
     ...(resolvedCurrency ? { resolvedCurrency } : {}),
   };
 }

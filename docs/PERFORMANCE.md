@@ -36,23 +36,25 @@ Sorted page of 50 by current salary, at offset 5,000, warm cache, median of 3 ru
 
 | Scenario | Status | p50 ms | p95 ms | max ms | Response |
 | --- | --- | --- | --- | --- | --- |
-| List, page 1 (sort by name) | 200 | 0.3 | 0.4 | 1.4 | 14.7 KB |
-| List, last page (offset 9,950) | 200 | 4.6 | 4.8 | 5.6 | 14.6 KB |
-| List, last page, 100 per page | 200 | 4.7 | 5.0 | 5.8 | 29.1 KB |
-| Search 'pat' (word prefix) | 200 | 2.1 | 2.2 | 2.6 | 14.6 KB |
-| Search + country + department | 200 | 0.8 | 1.0 | 1.9 | 14.7 KB |
-| Sort by salary, USD, page 1 | 200 | 8.7 | 9.2 | 21.9 | 14.8 KB |
-| Sort by salary, USD, last page | 200 | 10.8 | 12.0 | 19.5 | 11.8 KB |
-| Sort by salary, country=GB (currency resolved) | 200 | 1.1 | 1.2 | 1.9 | 14.8 KB |
-| Sort by salary, no filter -> 400 | 400 | 4.8 | 5.0 | 6.5 | 0.2 KB |
-| Employee detail with history | 200 | 0.1 | 0.1 | 0.3 | 1.5 KB |
-| Pay summary by country | 200 | 16.7 | 17.2 | 24.0 | 1.4 KB |
-| Pay summary by department | 200 | 18.5 | 19.0 | 23.1 | 12.8 KB |
-| Ask: department cost this month | 200 | 19.1 | 19.7 | 19.8 | 0.7 KB |
-| Ask: headcount by currency | 200 | 4.9 | 5.0 | 5.3 | 0.3 KB |
-| Ask: current salary 'priya' | 200 | 2.3 | 2.4 | 2.4 | 1.5 KB |
+| List, page 1 (sort by name) | 200 | 5.0 | 5.3 | 6.7 | 14.7 KB |
+| List, last page (offset 9,950) | 200 | 9.3 | 9.5 | 10.3 | 14.7 KB |
+| List, last page, 100 per page | 200 | 9.3 | 9.7 | 10.6 | 29.2 KB |
+| Search 'pat' (word prefix) | 200 | 2.9 | 2.9 | 4.5 | 14.7 KB |
+| Search + country + department | 200 | 1.2 | 1.2 | 2.2 | 14.7 KB |
+| Sort by salary, USD, page 1 | 200 | 8.4 | 8.7 | 9.1 | 14.9 KB |
+| Sort by salary, USD, last page | 200 | 10.3 | 10.7 | 12.0 | 11.9 KB |
+| Sort by salary, country=GB (currency resolved) | 200 | 1.1 | 1.1 | 1.7 | 14.9 KB |
+| Sort by salary, no filter -> 400 | 400 | 4.7 | 4.9 | 6.2 | 0.2 KB |
+| Employee detail with history | 200 | 0.1 | 0.1 | 0.2 | 1.5 KB |
+| Pay summary by country | 200 | 16.4 | 16.9 | 18.8 | 1.4 KB |
+| Pay summary by department | 200 | 18.1 | 18.5 | 19.9 | 12.8 KB |
+| Ask: department cost this month | 200 | 17.8 | 18.2 | 18.4 | 0.8 KB |
+| Ask: headcount by currency | 200 | 4.7 | 5.0 | 5.1 | 0.3 KB |
+| Ask: current salary 'priya' | 200 | 3.2 | 3.3 | 5.7 | 14.5 KB |
 
 Measured on an Apple Silicon Mac, Node 24. The worst p95 is about 20 ms, roughly 15× inside the 300 ms target.
+
+Re-measured on 2026-11-24, after the list started returning `salaryCurrencies` (the currencies the matches are paid in, which the UI needs to enable or disable the salary column). The unfiltered list now finds the distinct current currencies of all 10,000 employees on every request. That added about 5 ms to the list (page 1: 0.4 → 5.3 ms p95). The alternative was a second request from the UI, which costs a network round trip (~285 ms from India) instead of 5 ms of server time. The ask-by-name row grew from 1.5 KB to 14.5 KB earlier, when it started returning every match (up to 50) instead of one.
 
 ### Where the limits are
 

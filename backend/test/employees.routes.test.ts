@@ -102,6 +102,34 @@ describe("GET /api/employees: current salary", () => {
   });
 });
 
+describe("GET /api/employees: salaryCurrencies and asOf, for the UI's salary column", () => {
+  const mixed = (db: Db) => {
+    addPerson(db, "Yankee", { country: "US", salaries: [["2020-01-01", 100_000_00, "USD"]] });
+    addPerson(db, "Rupee", { country: "IN", salaries: [["2020-01-01", 3_000_000_00, "INR"]] });
+    addPerson(db, "Not Yet", { country: "IN", startDate: "2026-07-01", salaries: [["2026-07-01", 2_000_000_00, "INR"]] });
+  };
+
+  it("lists the currencies the matches are paid in today, and the date that decided it", async () => {
+    const { get } = setup(mixed);
+    const { body } = await get("/api/employees");
+    expect(body.asOf).toBe(TODAY);
+    expect(body.salaryCurrencies).toEqual(["INR", "USD"]);
+  });
+
+  it("narrows with the other filters, so one currency means the salary sort is allowed", async () => {
+    const { get } = setup(mixed);
+    expect((await get("/api/employees?country=US")).body.salaryCurrencies).toEqual(["USD"]);
+    expect((await get("/api/employees?currency=INR")).body.salaryCurrencies).toEqual(["INR"]);
+    expect((await get("/api/employees?search=zzz")).body.salaryCurrencies).toEqual([]);
+    expect((await get("/api/employees?currency=GBP")).body.salaryCurrencies).toEqual([]);
+  });
+
+  it("ignores people with no current salary yet", async () => {
+    const { get } = setup(mixed);
+    expect((await get("/api/employees?search=not")).body.salaryCurrencies).toEqual([]);
+  });
+});
+
 describe("GET /api/employees: sort by salary (decision D8)", () => {
   it("refuses to rank across currencies and names the currencies present", async () => {
     const { get } = setup((db) => {
