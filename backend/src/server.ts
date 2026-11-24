@@ -2,7 +2,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { buildApp } from "./app.js";
 import { todayInTimeZone } from "./clock.js";
-import { DATABASE_PATH, ORG_TIMEZONE } from "./config.js";
+import { DATABASE_PATH, ORG_TIMEZONE, UI_DIR } from "./config.js";
 import { openDatabase } from "./db/connection.js";
 import { migrate } from "./db/migrate.js";
 import { seedIfEmpty } from "./seed/seed-if-empty.js";
@@ -14,7 +14,7 @@ mkdirSync(dirname(DATABASE_PATH), { recursive: true });
 const db = openDatabase(DATABASE_PATH);
 migrate(db);
 
-const app = buildApp({ db, logger: process.env.NODE_ENV !== "test" });
+const app = buildApp({ db, logger: process.env.NODE_ENV !== "test", uiDir: UI_DIR });
 
 // SEED_ON_BOOT=if-empty: for hosts with an ephemeral disk, where each cold start begins empty.
 if (process.env.SEED_ON_BOOT === "if-empty") {

@@ -31,3 +31,17 @@ What the agent did, and where judgment was applied:
 - Prorated department cost by day, not "annual ÷ 12", so mid-month raises, hires and relocations count only for their days.
 - **Got a test wrong and kept the code:** the test rounded each person's cost before summing, while the SQL rounds once at the end. It fixed the test's arithmetic and documented the drift in the test.
 - Deviated from the requirements' "search against an indexed column" with numbers (D9).
+
+## Block 3: the UI
+
+**Prompt:** "The UI, working against the API you already deployed. The list with server-side pagination, the country and department filters plus the search box, the salary column disabled until a single currency is in play with the reason visible, the detail page with history and the append form, and the Ask panel with the three questions." An earlier instruction set the one non-obvious requirement: label the as-of date everywhere money appears, in the header, not a footnote.
+
+What the agent did, and where judgment was applied:
+
+- **Changed the API before building the column.** To disable the salary sort "until a single currency is in play", the UI has to know which currencies are in play. Rather than trying the sort and waiting for a 400, the list now returns `salaryCurrencies` and `asOf`. It re-ran the benchmark and wrote down the cost (~5 ms on the unfiltered list).
+- **Took the as-of date from each response, not the browser clock,** so labels stay true when the org's calendar and the viewer's disagree (D10, D11).
+- **Chose Vite over Next** and recorded why (D11). Also recorded why there is no virtualised list, instead of adding one to tick the box.
+- **Drove the app in a real browser** (local API, then the production Docker image): the salary column enabling under a currency filter, a scheduled record appended and shown as scheduled while the current salary stayed put, the Ask answers, and a reload on a deep link.
+- **Mutation-tested the UI tests:** with the debounce removed, the search test fails; with the salary column always enabled, two tests fail.
+- **Caught a flaky test** that only failed under parallel load: it read the column header before the list had loaded. It now waits for the rows.
+- **Fixed a real bug found while debugging something else:** a request aborted while its body was being read returned `null` as if it were data. The client now checks the signal after reading.

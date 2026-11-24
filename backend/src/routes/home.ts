@@ -32,7 +32,7 @@ export function escapeHtml(text: string): string {
 
 /** Landing page at / so the deployed URL explains itself instead of returning a 404. */
 export const homeRoutes =
-  ({ today, timeZone }: RouteContext): FastifyPluginAsync =>
+  ({ today, timeZone }: RouteContext, { atRoot = true } = {}): FastifyPluginAsync =>
   async (app) => {
     const page = () => `<!doctype html>
 <html lang="en">
@@ -66,6 +66,7 @@ ${EXAMPLES.map(([path, description]) => `<tr><td><a href="${escapeHtml(path)}">$
 </body>
 </html>`;
 
-    app.get("/", async (_request, reply) => reply.type("text/html; charset=utf-8").send(page()));
+    // Without a built UI, "/" explains the API instead of returning 404.
+    if (atRoot) app.get("/", async (_request, reply) => reply.type("text/html; charset=utf-8").send(page()));
     app.get("/api", async (_request, reply) => reply.type("text/html; charset=utf-8").send(page()));
   };

@@ -2,6 +2,7 @@ import Fastify, { type FastifyInstance } from "fastify";
 import type { Db } from "./db/connection.js";
 import { ApiError } from "./http/errors.js";
 import { addServerTiming } from "./http/server-timing.js";
+import { hasUi, serveUi } from "./http/ui.js";
 import { analyticsRoutes } from "./routes/analytics.js";
 import { employeeRoutes } from "./routes/employees.js";
 import { homeRoutes } from "./routes/home.js";
@@ -16,6 +17,8 @@ export interface AppDeps {
   /** "Today" as YYYY-MM-DD. Injected so tests can pin the date that decides what is current. */
   today?: () => string;
   logger?: boolean;
+  /** Directory of the built UI (frontend/dist). When present the UI takes "/" and the API landing page stays at /api. */
+  uiDir?: string;
 }
 
 export interface RouteContext {
@@ -24,7 +27,7 @@ export interface RouteContext {
   today: () => string;
 }
 
-export function buildApp({ db, timeZone = ORG_TIMEZONE, today, logger = false }: AppDeps): FastifyInstance {
+export function buildApp({ db, timeZone = ORG_TIMEZONE, today, logger = false, uiDir }: AppDeps): FastifyInstance {
   assertValidTimeZone(timeZone);
   const app = Fastify({ logger });
   const ctx: RouteContext = { db, timeZone, today: today ?? (() => todayInTimeZone(timeZone)) };
@@ -46,7 +49,9 @@ export function buildApp({ db, timeZone = ORG_TIMEZONE, today, logger = false }:
   });
 
   app.get("/api/health", async () => ({ status: "ok" }));
-  app.register(homeRoutes(ctx));
+  const withUi = hasUi(uiDir);
+  app.register(homeRoutes(ctx, { atRoot: !withUi }));
+  if (withUi) serveUi(app, uiDir);
   app.register(metaRoutes(ctx), { prefix: "/api" });
   app.register(employeeRoutes(ctx), { prefix: "/api" });
   app.register(analyticsRoutes(ctx), { prefix: "/api" });
